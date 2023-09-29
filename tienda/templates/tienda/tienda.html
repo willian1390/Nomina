@@ -1,0 +1,25 @@
+{% extends "NominaApp/base.html" %}
+
+{% load static %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    {% for producto in productos %}
+    <div class="col-md-3">
+      <div class="card" style="width: 100%; margin: 5px 5px;">
+        {% if producto.producto_imagen %}
+        <img src="{{ producto.producto_imagen.url }}" class="card-img-top">
+        {% endif %}
+        <div class="card-body" style="text-align: center;">
+          <h6 class="card-title">{{ producto.producto_nombre }}</h6>
+          <p class="card-text">Q {{ producto.producto_precio }}</p>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+
