@@ -27,3 +27,8 @@ urlpatterns = [
 
    
 ]
+
+
+admin.site.site_header = "Gestión de Nomina"
+admin.site.index_title = 'Panel de control'
+admin.site.site_title = 'Nomina'

@@ -50,9 +50,9 @@ class CompraProducto(models.Model):
     compra_cantidad = models.IntegerField(verbose_name="Cantidad", default=0)
     compra_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total", default=0)
 
-"""     def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs):
         if self.producto and self.compra_cantidad:
             self.compra_total = self.producto.producto_precio * self.compra_cantidad
         else:
             self.compra_total = 0
-        super().save(*args, **kwargs) """
+        super().save(*args, **kwargs)

@@ -1,0 +1,11 @@
+list_display_links #para que un atributo funcione como link
+list_editable #para agregar en la pantalla si un atributo es editable desde el panel
+fields = ['xx'] #solo aparecen estos atributos
+fields = ['xx', ('xx','yy')] # atributos en la misma fila
+
+#Crea grupos con secciones
+    fieldsets =(
+        ('Empleado',{
+            'fields': ('nomina_empleado_id', 'nomina_sueldo_base', 'nomina_aumento_total','nomina_interes',),
+        }),
+    )

@@ -52,7 +52,7 @@ class Empleado(models.Model):
     empleado_aumento = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aumento total", default=0, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.empleado_id} - {self.empleado_nombre} {self.empleado_apellido}"
+        return f"{self.empleado_id} - {self.empleado_nombre} {self.empleado_apellido}, {self.empleado_puesto}"
 
 
     def save(self, *args, **kwargs):
@@ -61,6 +61,12 @@ class Empleado(models.Model):
         # Asignar el salario del puesto al empleado
         self.empleado_salario = Puesto.puesto_cantidad
         super().save(*args, **kwargs)
+
+    # class Meta:
+    #     unique_together = ("puesto_id", "puesto_cantidad")
+    #     verbose_name='Puesto'
+    #     verbose_name_plural='Puestos'
+    #     #ordring = '-activo'
 
 
 class Aumento(models.Model):
