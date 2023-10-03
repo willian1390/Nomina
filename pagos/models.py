@@ -1,6 +1,7 @@
 from django.db import models
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
+from django.utils import timezone
 from decimal import Decimal
 from Empleados.models import Empleado, Departamento
 
@@ -16,7 +17,9 @@ class Nomina(models.Model):
     nomina_extras_calculada = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total horas extras", default=0, )
     nomina_dobles = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Horas dobles", default=0) #aplica dias festivos y domingos
     nomina_dobles_calculada = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total horas dobles", default=0, )
-    nomina_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes mensual", default=0, )
+    #Aporte solidarrio
+    nomina_aporte = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aporte total", default=0)
+    nomina_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes mensual", default=0)
     #Departamento de ventas
     nomina_ventas = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Venta realizada (Depto. Ventas)", default=0) #aplica solo a ventas
     nomina_comision = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Comision", default=0)
@@ -55,12 +58,10 @@ class Nomina(models.Model):
             self.nomina_dobles_calculada = dobles
         else:
             self.nomina_dobles_calculada = 0
-
-        #IGSS = sueldo base -bonificacion * 4.83%
-
+        
         #calculo de ingresos
-        sueldo = self.nomina_empleado_id.empleado_salario + self.nomina_empleado_id.empleado_aumento + self.nomina_extras_calculada + self.nomina_dobles_calculada
-        self.nomina_ingreso_total = sueldo
+        """sueldo = self.nomina_empleado_id.empleado_salario + self.nomina_empleado_id.empleado_aumento + self.nomina_extras_calculada + self.nomina_dobles_calculada
+        self.nomina_ingreso_total = sueldo """
         #calculo de descuentos
         
         #calculo pago neto
@@ -93,6 +94,12 @@ class Nomina(models.Model):
             self.nomina_bonificacion = 0
 
         super(Nomina, self).save(*args, **kwargs)
+
+    def calcular_ingresos_totales(self):
+            ingresos = self.nomina_sueldo_base + self.nomina_aumento_total + self.nomina_extras_calculada + self.nomina_dobles_calculada + self.nomina_comision + self.nomina_bonificacion
+            self.nomina_ingreso_total = ingresos
+            self.save()
+            return ingresos
 
     def calcular_bono_14(self, empleado):
         if empleado.empleado_contratacion and empleado.empleado_contratacion <= date(date.today().year, 7, 15):
@@ -139,30 +146,23 @@ class Aporte(models.Model):
     aporte_fecha = models.DateTimeField(auto_now_add=True)
     aporte_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
     aporte_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto", default=0)
+    aporte_acumulado = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Acumulado", default=0)
     
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs) 
-        empleado = self.nomina_empleado_id # Obtener el empleado asociado        
-        total_aumentos = Nomina.nomina or 0# Obtener el total de aumentos acumulados hasta ahora
-        total_aumentos += self.aumento_cantidad # Sumar el aumento actual al total acumulado
-        empleado.empleado_aumento = total_aumentos # Actualizar el atributo empleado_aumento del empleado
-        empleado.save()
-
-    def calcular_interes(self):
-        interes = self.aporte_cantidad * 0.05
-
+    def __str__(self):
+        return f"{self.aporte_empleado_id.empleado_nombre} { self.aporte_empleado_id.empleado_apellido}, {self.aporte_acumulado}"
 class Prestamo(models.Model):
-    MESES_CHOICES = (
-        ('6'),
-        ('12'),
-        ('18'),
-    )
+    MESES_CHOICES = [
+    ("6", "Seis Meses"),
+    ("8", "Ocho Seis Meses"),
+    ("12", "Doce Seis Meses"),
+]
     prestamo_id = models.AutoField(primary_key=True)
     prestamo_fecha = models.DateTimeField(auto_now_add=True)
     prestamo_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
     prestamo_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Prestamo", default=0)
-    prestamo_meses = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Tiempo", default=0)
-    prestamo_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes", default=0)
+    prestamo_meses = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Tiempo", choices=MESES_CHOICES)
+    prestamo_saldo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo", default=0)
+
 
 class Liquidacion(models.Model):
     liquidacion_id = models.AutoField(primary_key=True)
@@ -171,4 +171,24 @@ class Liquidacion(models.Model):
     liquidacion_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total", default=0)
 
 class Igss(models.Model):
-    pass
+    igss_id = models.AutoField(primary_key=True)
+    igss_fecha = models.DateTimeField(auto_now_add=True)
+    igss_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
+    igss_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto", default=0)
+
+@receiver(pre_save, sender=Igss)
+def calcular_igss_cantidad(sender, instance, **kwargs):
+    empleado = instance.igss_empleado_id
+    salario = empleado.empleado_salario
+    igss_cantidad = salario * Decimal(0.0483)
+        # Actualiza el campo igss_cantidad en la instancia de Igss
+    instance.igss_cantidad = igss_cantidad
+
+@receiver(pre_save, sender=Nomina)
+def actualizar_nomina_igss(sender, instance, **kwargs):
+    empleado = instance.nomina_empleado_id
+    igss_registro = Igss.objects.filter(
+        igss_empleado_id=empleado,
+    ).first()
+    if igss_registro:
+        instance.nomina_igss = igss_registro.igss_cantidad
