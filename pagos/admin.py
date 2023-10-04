@@ -26,11 +26,12 @@ class NominaAdmin(admin.ModelAdmin):
                 ('nomina_ingreso_total','nomina_descuento_total', 'nomina_neto')
                 ]
     list_display = ('nomina_id', 'nomina_empleado_id','nomina_ingreso_total',)
+    list_display_links = ["nomina_empleado_id"]
 
 class PrestamoAdmin(admin.ModelAdmin):
-    readonly_fields=('prestamo_saldo',)
+    readonly_fields=('prestamo_saldo','prestamo_mensualidad',)
 
-    list_display = ('prestamo_empleado_id', 'prestamo_saldo',)
+    list_display = ('prestamo_empleado_id', 'prestamo_saldo','prestamo_mensualidad',)
 
 class AporteAdmin(admin.ModelAdmin):
     readonly_fields=('aporte_acumulado',)
@@ -40,7 +41,7 @@ class IgssAdmin(admin.ModelAdmin):
     readonly_fields=('igss_cantidad',)
     list_display=('igss_empleado_id', 'igss_cantidad')
 
-    
+
 admin.site.register(Nomina, NominaAdmin)
 admin.site.register(Aporte, AporteAdmin)
 admin.site.register(Prestamo, PrestamoAdmin)

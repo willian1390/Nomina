@@ -12,6 +12,8 @@ from django.core.exceptions import ValidationError
 class Departamento(models.Model):
     departamento_id = models.AutoField(primary_key=True, verbose_name="ID",)
     departamento_nombre = models.CharField(max_length=50, verbose_name="Nombre")
+    class Meta:
+        unique_together = ('departamento_id','departamento_nombre')
 
     def __str__(self):
         return self.departamento_nombre
@@ -20,15 +22,15 @@ class Puesto(models.Model):
     puesto_id = models.AutoField(primary_key=True)
     puesto_departamento_id = models.ForeignKey(Departamento, verbose_name="Departamento", null=True, blank=True, on_delete=models.CASCADE, default=None)
     puesto_nombre = models.CharField(max_length=50, verbose_name="Nombre de puesto")
-    puesto_cantidad = models.IntegerField(verbose_name="Salario") 
+    puesto_cantidad = models.DecimalField(max_digits=10, decimal_places=2,verbose_name="Salario", default=0)
 
     class Meta:
-        unique_together = ("puesto_id", "puesto_cantidad")
+        unique_together = ('puesto_id','puesto_nombre')
         verbose_name='Puesto'
         verbose_name_plural='Puestos'
     
     def __str__(self):
-        return self.puesto_nombre
+        return f"{self.puesto_departamento_id}->{self.puesto_nombre}"
 
 
 class Empleado(models.Model):
@@ -42,8 +44,8 @@ class Empleado(models.Model):
     empleado_direccion = models.CharField(max_length=50, verbose_name="Direccion")
     empleado_telefono = models.CharField(max_length=50, verbose_name="Telefono")
     empleado_correo = models.EmailField(max_length=50, verbose_name="Correo")
-    empleado_esposa = models.CharField(max_length=50, verbose_name="Esposa")
-    empleado_hijos = models.TextField(verbose_name="Hijos")
+    empleado_esposa = models.CharField(max_length=50, verbose_name="Esposa", null=True, blank=True)
+    empleado_hijos = models.TextField(verbose_name="Hijos", null=True, blank=True)
     
     #llaves foraneas
     empleado_departamento = models.ForeignKey(Departamento, null=True, blank=True, on_delete=models.CASCADE, default=None)
@@ -54,19 +56,10 @@ class Empleado(models.Model):
     def __str__(self):
         return f"{self.empleado_id} - {self.empleado_nombre} {self.empleado_apellido}, {self.empleado_puesto}"
 
-
     def save(self, *args, **kwargs):
-        # Obtener el puesto seleccionado
         puesto = self.empleado_puesto
-        # Asignar el salario del puesto al empleado
-        self.empleado_salario = Puesto.puesto_cantidad
+        self.empleado_salario = puesto.puesto_cantidad
         super().save(*args, **kwargs)
-
-    # class Meta:
-    #     unique_together = ("puesto_id", "puesto_cantidad")
-    #     verbose_name='Puesto'
-    #     verbose_name_plural='Puestos'
-    #     #ordring = '-activo'
 
 
 class Aumento(models.Model):
@@ -96,8 +89,8 @@ class Ausencia(models.Model):
     ausencia_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
     ausencia_detalle = models.CharField(max_length=500, verbose_name="Detalle de ausencia")
     ausencia_aprovacion = models.BooleanField(default=False, verbose_name="Aprovar Ausencia")
-    ausencia_desNomina = models.BooleanField(default=False, verbose_name="Descuento en nomina?")
-    ausencia_descuento = models.IntegerField(verbose_name="Descuento", blank=True, null=True, default=0)
+    ausencia_desNomina = models.BooleanField(default=False, verbose_name="Descuento en nomina?", editable=False)
+    ausencia_descuento = models.DecimalField(max_digits=10, decimal_places=2,verbose_name="Descuento", default=0)
 
     def clean(self):
         if self.ausencia_aprovacion:

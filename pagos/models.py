@@ -41,7 +41,7 @@ class Nomina(models.Model):
     nomina_neto = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Sueldo Neto", default=0)
 
     def save(self, *args, **kwargs):
-        empleado = self.nomina_empleado_id
+        
         self.nomina_sueldo_base = self.nomina_empleado_id.empleado_salario
         self.nomina_aumento_total = self.nomina_empleado_id.empleado_aumento or 0
         #Calculo de horas extras
@@ -60,39 +60,11 @@ class Nomina(models.Model):
             self.nomina_dobles_calculada = 0
         
         #calculo de ingresos
-        """sueldo = self.nomina_empleado_id.empleado_salario + self.nomina_empleado_id.empleado_aumento + self.nomina_extras_calculada + self.nomina_dobles_calculada
-        self.nomina_ingreso_total = sueldo """
+        sueldo = self.nomina_empleado_id.empleado_salario + self.nomina_empleado_id.empleado_aumento + self.nomina_extras_calculada + self.nomina_dobles_calculada
+        self.nomina_ingreso_total = sueldo
         #calculo de descuentos
         
         #calculo pago neto
-
-
-        if empleado.empleado_departamento:
-            if empleado.empleado_departamento.departamento_nombre == 'Ventas':
-                # Calcula la comisión en función de las ventas
-                if 0 <= self.nomina_ventas <= 100000:
-                    self.nomina_comision = 0
-                elif 100001 <= self.nomina_ventas <= 200000:
-                    self.nomina_comision = self.nomina_ventas * 0.025
-                elif 200001 <= self.nomina_ventas <= 400000:
-                    self.nomina_comision = self.nomina_ventas * 0.035
-                else:
-                    self.nomina_comision = self.nomina_ventas * 0.045
-                # La bonificación en ventas es 0 para el departamento de Ventas
-                self.nomina_bonificacion = 0
-            elif empleado.empleado_departamento.departamento_nombre == 'Produccion':
-                # Calcula la bonificación en función de las piezas elaboradas
-                self.nomina_bonificacion = float(self.nomina_piezas) * 0.05
-                # La comisión en producción es 0
-                self.nomina_comision = 0
-            else:
-                # Otros departamentos no tienen comisión ni bonificación
-                self.nomina_comision = 0
-                self.nomina_bonificacion = 0
-        else:
-            self.nomina_comision = 0
-            self.nomina_bonificacion = 0
-
         super(Nomina, self).save(*args, **kwargs)
 
     def calcular_ingresos_totales(self):
@@ -138,9 +110,6 @@ class Nomina(models.Model):
         return f"{self.nomina_empleado_id.empleado_nombre} { self.nomina_empleado_id.empleado_apellido}, {self.nomina_empleado_id.empleado_puesto}"
     
 
-
-
-
 class Aporte(models.Model):
     aporte_id = models.AutoField(primary_key=True)
     aporte_fecha = models.DateTimeField(auto_now_add=True)
@@ -150,19 +119,24 @@ class Aporte(models.Model):
     
     def __str__(self):
         return f"{self.aporte_empleado_id.empleado_nombre} { self.aporte_empleado_id.empleado_apellido}, {self.aporte_acumulado}"
+
 class Prestamo(models.Model):
-    MESES_CHOICES = [
-    ("6", "Seis Meses"),
-    ("8", "Ocho Seis Meses"),
-    ("12", "Doce Seis Meses"),
-]
     prestamo_id = models.AutoField(primary_key=True)
     prestamo_fecha = models.DateTimeField(auto_now_add=True)
     prestamo_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
     prestamo_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Prestamo", default=0)
-    prestamo_meses = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Tiempo", choices=MESES_CHOICES)
+    prestamo_meses = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Tiempo (6, 12 y 18 M)")
+    prestamo_mensualidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Mensualidades", default=0)
     prestamo_saldo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo", default=0)
 
+    def save(self, *args, **kwargs):
+        self.prestamo_saldo = self.prestamo_cantidad
+        prestamo = self.prestamo_cantidad
+        meses = self.prestamo_meses
+        interes = Decimal('0.00417')
+        mensualidad = (interes * prestamo) / (1-(1+interes)**(-meses))
+        self.prestamo_mensualidad = mensualidad
+        super(Prestamo, self).save(*args, **kwargs)
 
 class Liquidacion(models.Model):
     liquidacion_id = models.AutoField(primary_key=True)
@@ -173,15 +147,35 @@ class Liquidacion(models.Model):
 class Igss(models.Model):
     igss_id = models.AutoField(primary_key=True)
     igss_fecha = models.DateTimeField(auto_now_add=True)
-    igss_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
+    igss_empleado_id = models.OneToOneField(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
     igss_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto", default=0)
+
+@receiver(post_save, sender=Nomina)
+def actualizar_prestamo(sender, instance, created, **kwargs):
+    # Verifica si se creó una nueva instancia de Nomina
+    if created:
+        empleado = instance.nomina_empleado_id
+        # Verifica si el empleado tiene un préstamo
+        try:
+            prestamo = Prestamo.objects.get(prestamo_empleado_id=empleado)
+        except Prestamo.DoesNotExist:
+            prestamo = None
+
+        if prestamo:
+            # Resta la mensualidad del préstamo al saldo actual
+            prestamo_mensualidad = prestamo.prestamo_mensualidad
+            prestamo.prestamo_saldo -= prestamo_mensualidad
+            prestamo.save()
+            # Actualiza el campo nomina_prestamo de la instancia de Nomina
+            instance.nomina_prestamo = prestamo_mensualidad
+            instance.save()
+
 
 @receiver(pre_save, sender=Igss)
 def calcular_igss_cantidad(sender, instance, **kwargs):
     empleado = instance.igss_empleado_id
     salario = empleado.empleado_salario
     igss_cantidad = salario * Decimal(0.0483)
-        # Actualiza el campo igss_cantidad en la instancia de Igss
     instance.igss_cantidad = igss_cantidad
 
 @receiver(pre_save, sender=Nomina)
@@ -192,3 +186,24 @@ def actualizar_nomina_igss(sender, instance, **kwargs):
     ).first()
     if igss_registro:
         instance.nomina_igss = igss_registro.igss_cantidad
+    
+@receiver(post_save, sender=Nomina)
+def calcular_bonificacion(sender, instance, created, **kwargs):
+    # Verifica si el empleado pertenece al departamento de producción y si se creó una nueva instancia de Nomina
+    if instance.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Produccion' and created:
+        # Realizar el cálculo de la bonificación
+        piezas_realizadas = instance.nomina_piezas
+        bonificacion = piezas_realizadas * Decimal('0.05')
+        instance.nomina_bonificacion = bonificacion
+        instance.save()
+
+@receiver(post_save, sender=Nomina)
+def calcular_comision(sender, instance, created, **kwargs):
+    # Verifica si el empleado pertenece al departamento de ventas y si se creó una nueva instancia de Nomina
+    if instance.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Ventas' and created:
+        # Realizar el cálculo de la comisión
+        ventas = instance.nomina_ventas
+        comision = ventas * Decimal('0.05')
+        instance.nomina_comision = comision
+        instance.save()
+

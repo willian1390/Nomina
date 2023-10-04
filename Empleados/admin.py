@@ -21,6 +21,8 @@ class EmpleadoAdmin(admin.ModelAdmin):
                   )
     search_fields=["empleado_id", "empleado_nombre", "empleado_apellido"]
     list_per_page = 20
+    list_display_links = ["empleado_nombre"]
+
     #ordering = ('active',) #ordenar por activo
     #date_hierarchy='fecha de creacion'
 
