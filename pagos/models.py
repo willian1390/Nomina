@@ -19,7 +19,7 @@ class Nomina(models.Model):
     nomina_dobles_calculada = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total horas dobles", default=0, )
     #Aporte solidarrio
     nomina_aporte = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aporte total", default=0)
-    nomina_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes mensual", default=0)
+    nomina_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes mensual", default=0, editable=False)
     #Departamento de ventas
     nomina_ventas = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Venta realizada (Depto. Ventas)", default=0) #aplica solo a ventas
     nomina_comision = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Comision", default=0)
@@ -128,9 +128,9 @@ class Prestamo(models.Model):
     prestamo_meses = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Tiempo (6, 12 y 18 M)")
     prestamo_mensualidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Mensualidades", default=0)
     prestamo_saldo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo", default=0)
+    prestamo_aporte = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aporte", default=0)
 
     def save(self, *args, **kwargs):
-        self.prestamo_saldo = self.prestamo_cantidad
         prestamo = self.prestamo_cantidad
         meses = self.prestamo_meses
         interes = Decimal('0.00417')
@@ -151,6 +151,28 @@ class Igss(models.Model):
     igss_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto", default=0)
 
 @receiver(post_save, sender=Nomina)
+def actualizar_aporte(sender, instance, created, **kwargs):
+    # Verifica si se creó una nueva instancia de Nomina
+    if created:
+        empleado = instance.nomina_empleado_id
+        # Verifica si el empleado tiene un aporte
+        try:
+            aporte = Aporte.objects.get(aporte_empleado_id=empleado)
+        except Aporte.DoesNotExist:
+            aporte = None
+
+        if aporte:
+            # Actualiza el campo nomina_aporte de la instancia de Nomina
+            instance.nomina_aporte = aporte.aporte_cantidad
+            # Realiza los cálculos para actualizar el aporte acumulado
+            interes = Decimal('0.00417')
+            aporte.aporte_acumulado += aporte.aporte_cantidad
+            # Guarda los cambios en el modelo Aporte
+            aporte.save()
+            # Guarda la instancia de Nomina actualizada
+            instance.save()
+
+@receiver(post_save, sender=Nomina)
 def actualizar_prestamo(sender, instance, created, **kwargs):
     # Verifica si se creó una nueva instancia de Nomina
     if created:
@@ -162,14 +184,16 @@ def actualizar_prestamo(sender, instance, created, **kwargs):
             prestamo = None
 
         if prestamo:
-            # Resta la mensualidad del préstamo al saldo actual
-            prestamo_mensualidad = prestamo.prestamo_mensualidad
-            prestamo.prestamo_saldo -= prestamo_mensualidad
-            prestamo.save()
             # Actualiza el campo nomina_prestamo de la instancia de Nomina
-            instance.nomina_prestamo = prestamo_mensualidad
+            instance.nomina_prestamo = prestamo.prestamo_mensualidad
+            # Realiza los cálculos para actualizar el préstamo
+            prestamo.prestamo_aporte += prestamo.prestamo_mensualidad
+            saldo = prestamo.prestamo_cantidad - prestamo.prestamo_aporte
+            prestamo.prestamo_saldo = saldo
+            # Guarda los cambios en el modelo Prestamo
+            prestamo.save()
+            # Guarda la instancia de Nomina actualizada
             instance.save()
-
 
 @receiver(pre_save, sender=Igss)
 def calcular_igss_cantidad(sender, instance, **kwargs):
@@ -195,6 +219,7 @@ def calcular_bonificacion(sender, instance, created, **kwargs):
         piezas_realizadas = instance.nomina_piezas
         bonificacion = piezas_realizadas * Decimal('0.05')
         instance.nomina_bonificacion = bonificacion
+        instance.nomina_comision = 0
         instance.save()
 
 @receiver(post_save, sender=Nomina)
@@ -205,5 +230,6 @@ def calcular_comision(sender, instance, created, **kwargs):
         ventas = instance.nomina_ventas
         comision = ventas * Decimal('0.05')
         instance.nomina_comision = comision
+        instance.nomina_bonificacion = 0
         instance.save()
 

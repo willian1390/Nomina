@@ -9,15 +9,15 @@ from .models import *
 #CREAR ESTADO DE CUENTA
 
 class NominaAdmin(admin.ModelAdmin):
-    readonly_fields=('nomina_fecha', 'nomina_interes', 'nomina_comision', 'nomina_bonificacion', 
+    readonly_fields=('nomina_fecha', 'nomina_comision', 'nomina_bonificacion', 
                     'nomina_bono', 'nomina_aguinaldo', 'nomina_igss', 'nomina_tienda', 'nomina_prestamo',
-                      'nomina_interes', 'nomina_neto','nomina_sueldo_base','nomina_aumento_total',
-                        'nomina_extras_calculada','nomina_dobles_calculada',
-                        'nomina_ingreso_total','nomina_descuento_total','nomina_aporte',)
+                    'nomina_neto','nomina_sueldo_base','nomina_aumento_total',
+                    'nomina_extras_calculada','nomina_dobles_calculada',
+                    'nomina_ingreso_total','nomina_descuento_total','nomina_aporte',)
 
     fields = [('nomina_fecha'),
               ('nomina_empleado_id', 'nomina_sueldo_base', 'nomina_aumento_total'),
-              ('nomina_aporte','nomina_interes'),
+              ('nomina_aporte'),
               ('nomina_extras','nomina_extras_calculada'),
               ('nomina_dobles','nomina_dobles_calculada'),
                ('nomina_ventas', 'nomina_comision'),
@@ -29,9 +29,9 @@ class NominaAdmin(admin.ModelAdmin):
     list_display_links = ["nomina_empleado_id"]
 
 class PrestamoAdmin(admin.ModelAdmin):
-    readonly_fields=('prestamo_saldo','prestamo_mensualidad',)
+    readonly_fields=('prestamo_saldo','prestamo_mensualidad','prestamo_aporte',)
 
-    list_display = ('prestamo_empleado_id', 'prestamo_saldo','prestamo_mensualidad',)
+    list_display = ('prestamo_empleado_id', 'prestamo_saldo','prestamo_mensualidad', 'prestamo_aporte',)
 
 class AporteAdmin(admin.ModelAdmin):
     readonly_fields=('aporte_acumulado',)
