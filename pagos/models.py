@@ -18,14 +18,14 @@ class Nomina(models.Model):
     nomina_dobles = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Horas dobles", default=0) #aplica dias festivos y domingos
     nomina_dobles_calculada = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total horas dobles", default=0, )
     #Aporte solidarrio
-    nomina_aporte = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aporte total", default=0)
-    nomina_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes mensual", default=0, editable=False)
+    nomina_aporte = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aporte Solidario", default=0)
+    #nomina_interes = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Interes mensual", default=0, editable=False)
     #Departamento de ventas
-    nomina_ventas = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Venta realizada (Depto. Ventas)", default=0) #aplica solo a ventas
-    nomina_comision = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Comision", default=0)
+    nomina_ventas = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Venta realizada (Depto. Ventas)", default=0, null=True, blank=True) #aplica solo a ventas
+    nomina_comision = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Comision", default=0, null=True, blank=True)
     #Departamento de Produccion
-    nomina_piezas = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Piezas hechas (Depto. Produccion)", default=0) #aplica solo a produccion 
-    nomina_bonificacion = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Bonificacion", default=0)
+    nomina_piezas = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Piezas hechas (Depto. Produccion)", default=0, null=True, blank=True) #aplica solo a produccion 
+    nomina_bonificacion = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Bonificacion", default=0, null=True, blank=True)
     #aplicar solo si es el mes correcto
     nomina_bono = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Bono 14", default=0, editable=False) #aplica solo si es julio
     nomina_aguinaldo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aguinaldo", default=0, editable=False) #aplica solo si es noviembre
@@ -40,8 +40,7 @@ class Nomina(models.Model):
     nomina_descuento_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Descuento total", default=0)
     nomina_neto = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Sueldo Neto", default=0)
 
-    def save(self, *args, **kwargs):
-        
+    def save(self, *args, **kwargs):        
         self.nomina_sueldo_base = self.nomina_empleado_id.empleado_salario
         self.nomina_aumento_total = self.nomina_empleado_id.empleado_aumento or 0
         #Calculo de horas extras
@@ -58,20 +57,21 @@ class Nomina(models.Model):
             self.nomina_dobles_calculada = dobles
         else:
             self.nomina_dobles_calculada = 0
-        
-        #calculo de ingresos
-        sueldo = self.nomina_empleado_id.empleado_salario + self.nomina_empleado_id.empleado_aumento + self.nomina_extras_calculada + self.nomina_dobles_calculada
-        self.nomina_ingreso_total = sueldo
-        #calculo de descuentos
-        
-        #calculo pago neto
         super(Nomina, self).save(*args, **kwargs)
 
-    def calcular_ingresos_totales(self):
-            ingresos = self.nomina_sueldo_base + self.nomina_aumento_total + self.nomina_extras_calculada + self.nomina_dobles_calculada + self.nomina_comision + self.nomina_bonificacion
-            self.nomina_ingreso_total = ingresos
-            self.save()
-            return ingresos
+    def save(self, *args, **kwargs):
+        # Verificar el departamento del empleado
+        if self.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Ventas':
+            # Si pertenece al departamento de Ventas, establecer los campos de Producción como no editables
+            self.nomina_piezas = None
+            self.nomina_bonificacion = None
+        elif self.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Produccion':
+            # Si pertenece al departamento de Producción, establecer los campos de Ventas como no editables
+            self.nomina_ventas = None
+            self.nomina_comision = None
+
+        super().save(*args, **kwargs)
+
 
     def calcular_bono_14(self, empleado):
         if empleado.empleado_contratacion and empleado.empleado_contratacion <= date(date.today().year, 7, 15):
@@ -165,8 +165,8 @@ def actualizar_aporte(sender, instance, created, **kwargs):
             # Actualiza el campo nomina_aporte de la instancia de Nomina
             instance.nomina_aporte = aporte.aporte_cantidad
             # Realiza los cálculos para actualizar el aporte acumulado
-            interes = Decimal('0.00417')
-            aporte.aporte_acumulado += aporte.aporte_cantidad
+            aumento_porcentaje = aporte.aporte_cantidad * Decimal('0.05')
+            aporte.aporte_acumulado += aporte.aporte_cantidad + aumento_porcentaje
             # Guarda los cambios en el modelo Aporte
             aporte.save()
             # Guarda la instancia de Nomina actualizada
@@ -219,7 +219,7 @@ def calcular_bonificacion(sender, instance, created, **kwargs):
         piezas_realizadas = instance.nomina_piezas
         bonificacion = piezas_realizadas * Decimal('0.05')
         instance.nomina_bonificacion = bonificacion
-        instance.nomina_comision = 0
+        #instance.nomina_comision = 0
         instance.save()
 
 @receiver(post_save, sender=Nomina)
@@ -228,8 +228,15 @@ def calcular_comision(sender, instance, created, **kwargs):
     if instance.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Ventas' and created:
         # Realizar el cálculo de la comisión
         ventas = instance.nomina_ventas
-        comision = ventas * Decimal('0.05')
+        if ventas <= Decimal('100000'):
+            comision = ventas * Decimal('0.0')
+        elif ventas <= Decimal('200000'):
+            comision = ventas * Decimal('0.025')
+        elif ventas <= Decimal('400000'):
+            comision = ventas * Decimal('0.035')
+        else:
+            comision = ventas * Decimal('0.045')
         instance.nomina_comision = comision
-        instance.nomina_bonificacion = 0
+        #instance.nomina_bonificacion = 0
         instance.save()
 
