@@ -17,7 +17,8 @@ class EmpleadoAdmin(admin.ModelAdmin):
                   "fecha_format", 
                   "salario",
                   "aumento",
-                  "foto"
+                  "foto",
+                  "empleado_estado"
                   )
     search_fields=["empleado_id", "empleado_nombre", "empleado_apellido"]
     list_per_page = 20

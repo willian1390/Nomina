@@ -16,7 +16,7 @@ class CompraProductoInline(admin.TabularInline):
     list_display=("compra_id", "compra_empleado_id",)
 
 class ProductoAdmin(admin.ModelAdmin):
-    inlines = [CompraProductoInline,]
+    #inlines = [CompraProductoInline,]
     search_fields = ('producto_nombre'),
     ordering = ['producto_nombre']
     list_display=("producto_nombre", "producto_precio", "producto_seccion",)
@@ -96,9 +96,6 @@ class CompraAdmin(admin.ModelAdmin):
         return response
 
     generar_pdf_compra.short_description = "Generar PDF de Detalle de Compra"
-
-#
-
 
 admin.site.register(Producto, ProductoAdmin)
 admin.site.register(Seccion)

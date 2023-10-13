@@ -6,9 +6,6 @@ from datetime import datetime, date
 from django.core.exceptions import ValidationError
 
 # Create your models here.
-
-
-
 class Departamento(models.Model):
     departamento_id = models.AutoField(primary_key=True, verbose_name="ID",)
     departamento_nombre = models.CharField(max_length=50, verbose_name="Nombre")
@@ -30,12 +27,11 @@ class Puesto(models.Model):
         verbose_name_plural='Puestos'
     
     def __str__(self):
-        return f"{self.puesto_departamento_id}->{self.puesto_nombre}"
-
+        return f"{self.puesto_nombre} ({self.puesto_departamento_id})"
 
 class Empleado(models.Model):
     empleado_id = models.AutoField(primary_key=True, verbose_name="ID",)
-    empleado_estado = models.BooleanField(default=True)
+    empleado_estado = models.BooleanField(default=True, verbose_name="O")
     empleado_contratacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de contratacion")
     empleado_dpi = models.CharField(max_length=50, verbose_name="DPI")
     empleado_foto = models.ImageField(upload_to='empleados')
@@ -44,8 +40,8 @@ class Empleado(models.Model):
     empleado_direccion = models.CharField(max_length=50, verbose_name="Direccion")
     empleado_telefono = models.CharField(max_length=50, verbose_name="Telefono")
     empleado_correo = models.EmailField(max_length=50, verbose_name="Correo")
-    empleado_esposa = models.CharField(max_length=50, verbose_name="Esposa", null=True, blank=True)
-    empleado_hijos = models.TextField(verbose_name="Hijos", null=True, blank=True)
+    empleado_esposa = models.CharField(max_length=50, verbose_name="Esposa", null=True, blank=True,default='')
+    empleado_hijos = models.TextField(verbose_name="Hijos", null=True, blank=True, default='')
     
     #llaves foraneas
     empleado_departamento = models.ForeignKey(Departamento, null=True, blank=True, on_delete=models.CASCADE, default=None)
@@ -60,7 +56,6 @@ class Empleado(models.Model):
         puesto = self.empleado_puesto
         self.empleado_salario = puesto.puesto_cantidad
         super().save(*args, **kwargs)
-
 
 class Aumento(models.Model):
     aumento_id = models.AutoField(primary_key=True)
@@ -81,7 +76,6 @@ class Aumento(models.Model):
     
     def get_fecha_formateada(self):
         return self.aumento_fecha.strftime('%d de %B del %Y')
-
 
 class Ausencia(models.Model):
     ausencia_id = models.AutoField(primary_key=True)

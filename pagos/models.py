@@ -2,8 +2,10 @@ from django.db import models
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from datetime import timedelta, date
 from decimal import Decimal
 from Empleados.models import Empleado, Departamento
+from tienda.models import CompraProducto
 
 # Create your models here.
 class Nomina(models.Model):
@@ -57,59 +59,21 @@ class Nomina(models.Model):
             self.nomina_dobles_calculada = dobles
         else:
             self.nomina_dobles_calculada = 0
+
+        # # Verificar el departamento del empleado
+        # if self.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Ventas':
+        #     # Si pertenece al departamento de Ventas, establecer los campos de Producción como no editables
+        #     self.nomina_piezas = None
+        #     self.nomina_bonificacion = None
+        # elif self.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Produccion':
+        #     # Si pertenece al departamento de Producción, establecer los campos de Ventas como no editables
+        #     self.nomina_ventas = None
+        #     self.nomina_comision = None
         super(Nomina, self).save(*args, **kwargs)
-
-    def save(self, *args, **kwargs):
-        # Verificar el departamento del empleado
-        if self.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Ventas':
-            # Si pertenece al departamento de Ventas, establecer los campos de Producción como no editables
-            self.nomina_piezas = None
-            self.nomina_bonificacion = None
-        elif self.nomina_empleado_id.empleado_departamento.departamento_nombre == 'Produccion':
-            # Si pertenece al departamento de Producción, establecer los campos de Ventas como no editables
-            self.nomina_ventas = None
-            self.nomina_comision = None
-
-        super().save(*args, **kwargs)
-
-
-    def calcular_bono_14(self, empleado):
-        if empleado.empleado_contratacion and empleado.empleado_contratacion <= date(date.today().year, 7, 15):
-            # El empleado ha trabajado en la empresa durante más de un año
-            self.nomina_bono = empleado.empleado_salario
-        else:
-            # El empleado ha trabajado en la empresa menos de un año
-            if empleado.empleado_contratacion:
-                dias_laborados = (date(date.today().year, 7, 15) - empleado.empleado_contratacion).days
-                self.nomina_bono = (empleado.empleado_salario * dias_laborados) / 365
-            else:
-                self.nomina_bono = 0  # No hay fecha de contratación
-        self.calcular_bono_14(empleado)
-
-    def calcular_aguinaldo(self, empleado):
-        if empleado.empleado_contratacion:
-            if empleado.empleado_contratacion.year == date.today().year:
-                # El empleado fue contratado durante el mismo año
-                dias_laborados = (date.today() - empleado.empleado_contratacion).days
-            else:
-                # El empleado fue contratado en años anteriores
-                dias_laborados = (date(date.today().year, 11, 15) - empleado.empleado_contratacion).days
-
-            promedio_sueldo_base_anual = empleado.empleado_salario * 12  # Sueldo base mensual multiplicado por 12 meses
-            if dias_laborados < 365:
-                # El empleado lleva menos de un año en la empresa
-                self.nomina_aguinaldo = (dias_laborados * promedio_sueldo_base_anual) / 365
-            else:
-                # El empleado lleva más de un año en la empresa
-                self.nomina_aguinaldo = (365 * promedio_sueldo_base_anual) / 365
-        else:
-            self.nomina_aguinaldo = 0  # No hay fecha de contratación
-        self.calcular_aguinaldo(empleado)
 
     def __str__(self):
         return f"{self.nomina_empleado_id.empleado_nombre} { self.nomina_empleado_id.empleado_apellido}, {self.nomina_empleado_id.empleado_puesto}"
     
-
 class Aporte(models.Model):
     aporte_id = models.AutoField(primary_key=True)
     aporte_fecha = models.DateTimeField(auto_now_add=True)
@@ -138,17 +102,126 @@ class Prestamo(models.Model):
         self.prestamo_mensualidad = mensualidad
         super(Prestamo, self).save(*args, **kwargs)
 
-class Liquidacion(models.Model):
-    liquidacion_id = models.AutoField(primary_key=True)
-    liquidacion_fecha = models.DateTimeField(auto_now_add=True)
-    liquidacion_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
-    liquidacion_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total", default=0)
-
 class Igss(models.Model):
     igss_id = models.AutoField(primary_key=True)
     igss_fecha = models.DateTimeField(auto_now_add=True)
     igss_empleado_id = models.OneToOneField(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
+    igss_nac = models.DateField(verbose_name='Fecha de nacimiento', default=timezone.now)
+    igss_sexo = models.CharField(max_length=50, verbose_name="Sexo", default='')
+    igss_civil = models.CharField(max_length=50, verbose_name="Estado civil", default='Soltero')
+    igss_nacion = models.CharField(max_length=50, verbose_name="Nacionalidad", default='Guatemalteca')
+    igss_departamento = models.CharField(max_length=50, verbose_name="Departamento", default='')
+    igss_municipio = models.CharField(max_length=50, verbose_name="Municipio", default='')
+    igss_ncp = models.CharField(max_length=50, verbose_name="Nombre completo de Padre", default='')
+    igss_ncm = models.CharField(max_length=50, verbose_name="Nombre completo de Madre", default='')
     igss_cantidad = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto", default=0)
+
+    def __str__(self):
+        return f"{self.igss_empleado_id.empleado_nombre} { self.igss_empleado_id.empleado_apellido}"
+    
+class Bono14(models.Model):
+    bono_id = models.AutoField(primary_key=True)
+    bono_empleado_id = models.ForeignKey(Empleado, on_delete=models.CASCADE, verbose_name="Empleado")
+    bono_fecha = models.DateField(auto_now_add=True)
+    bono_monto = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Bono 14", default=0)
+
+class Aguinaldo(models.Model):
+    aguinaldo_id = models.AutoField(primary_key=True)
+    aguinaldo_empleado_id = models.ForeignKey(Empleado, on_delete=models.CASCADE, verbose_name="Empleado")
+    aguinaldo_fecha = models.DateField(auto_now_add=True)
+    aguinaldo_monto = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aguinaldo", default=0)
+
+class Liquidacion(models.Model):
+    liquidacion_id = models.AutoField(primary_key=True)
+    liquidacion_fecha = models.DateTimeField(auto_now_add=True)
+    liquidacion_empleado_id = models.ForeignKey(Empleado, null=False, default=None, blank=False, on_delete=models.CASCADE, verbose_name="Empleado")
+    liquidacion_sm = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Promedio Sueldo Mensual", default=0)
+    liquidacion_sc = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Promedio Sueldo Correspondiente", default=0)
+    liquidacion_ind = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Indemnizacion", default=0)
+    liquidacion_ag = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Aguinaldo pendiente", default=0)
+    liquidacion_bn = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Bono 14 pendiente", default=0)
+    liquidacion_vc = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Vacaciones pendientes", default=0)
+    liquidacion_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total", default=0)
+
+    def save(self, *args, **kwargs):
+        empleado = self.liquidacion_empleado_id
+        #sueldo mensual
+        mensualidad_sm = self.liquidacion_empleado_id.empleado_salario + self.liquidacion_empleado_id.empleado_aumento
+        #montos de bono y aguinaldo
+        ultimo_bono = Bono14.objects.filter(bono_empleado_id=empleado).order_by('-bono_fecha').first()
+        monto_bono = ultimo_bono.bono_monto if ultimo_bono else 0
+        ultimo_aguinaldo = Aguinaldo.objects.filter(aguinaldo_empleado_id=empleado).order_by('-aguinaldo_fecha').first()
+        monto_aguinaldo = ultimo_aguinaldo.aguinaldo_monto if ultimo_aguinaldo else 0
+        #sueldo correspondiente
+        mensualidad_sc = mensualidad_sm + monto_bono + monto_aguinaldo
+        # Calcular días trabajados
+        fecha_actual = date.today()
+        dias_laborados = (fecha_actual - empleado.empleado_contratacion.date()).days
+        #indemnizacion
+        indemnizacion = (dias_laborados * mensualidad_sm) / 365
+        #aguinaldo pendiente
+        fecha_pasada_a = date(date.today().year - 1, 12, 1)
+        dias_aguinaldo = (fecha_actual - fecha_pasada_a).days
+        aguinaldo = (dias_aguinaldo * mensualidad_sm) / 365
+        #bono pendiente
+        fecha_pasada_b = date(date.today().year - 1, 7, 1)
+        dias_bono = (fecha_actual - fecha_pasada_b).days
+        bono = (dias_bono * mensualidad_sm) / 365
+        #vacaciones
+        fecha_contratacion = empleado.empleado_contratacion
+        dias_vacaciones = (fecha_actual - fecha_contratacion.date()).days
+        vacaciones_pendientes = (dias_vacaciones * 17) / 365
+        sueldo_diario = mensualidad_sm / 30
+        vacaciones = sueldo_diario * Decimal(vacaciones_pendientes)
+        #total liquidacion
+        total_liq = indemnizacion + aguinaldo + bono + vacaciones
+
+        self.liquidacion_sm = mensualidad_sm
+        self.liquidacion_sc = mensualidad_sc
+        self.liquidacion_ind = indemnizacion
+        self.liquidacion_bn = bono
+        self.liquidacion_ag = aguinaldo
+        self.liquidacion_vc = vacaciones
+        self.liquidacion_total = total_liq
+
+        super(Liquidacion, self).save(*args, **kwargs)
+
+        if self.liquidacion_empleado_id:
+            empleado = self.liquidacion_empleado_id
+            empleado.empleado_estado = False  # Cambiar el estado a False
+            empleado.save()
+
+    def __str__(self):
+        return f"{self.liquidacion_empleado_id.empleado_nombre} { self.liquidacion_empleado_id.empleado_apellido}, {self.liquidacion_empleado_id.empleado_puesto}"
+
+#Artículo 2. La bonificación anual será equivalente al cien por ciento (100%) del salario o sueldo ordinario devengado
+@receiver(pre_save, sender=Bono14)
+def calcular_bono_14(sender, instance, **kwargs):
+    empleado = instance.bono_empleado_id
+    salario_ordinario = empleado.empleado_salario + empleado.empleado_aumento
+
+    # Calcular el bono 14 según las condiciones
+    if timezone.now().month == 7 and empleado.empleado_contratacion + timedelta(days=365) <= timezone.now():
+        # Más de un año trabajando
+        instance.bono_monto = salario_ordinario
+    else:
+        # Menos de un año trabajando
+        dias_laborados = (timezone.now() - empleado.empleado_contratacion).days
+        instance.bono_monto = (salario_ordinario * dias_laborados) / 365
+
+@receiver(pre_save, sender=Bono14)
+def calcular_aguinaldo(sender, instance, **kwargs):
+    empleado = instance.bono_empleado_id
+    salario_ordinario = empleado.empleado_salario + empleado.empleado_aumento
+
+    # Calcular el bono 14 según las condiciones
+    if timezone.now().month == 11 and empleado.empleado_contratacion + timedelta(days=365) <= timezone.now():
+        # Más de un año trabajando
+        instance.aguinaldo_monto = salario_ordinario
+    else:
+        # Menos de un año trabajando
+        dias_laborados = (timezone.now() - empleado.empleado_contratacion).days
+        instance.aguinaldo_monto = (salario_ordinario * dias_laborados) / 365
 
 @receiver(post_save, sender=Nomina)
 def actualizar_aporte(sender, instance, created, **kwargs):
@@ -238,5 +311,73 @@ def calcular_comision(sender, instance, created, **kwargs):
             comision = ventas * Decimal('0.045')
         instance.nomina_comision = comision
         #instance.nomina_bonificacion = 0
+        instance.save()
+
+@receiver(post_save, sender=Nomina)
+def actualizar_nomina_tienda(sender, instance, created, **kwargs):
+    if created:
+        empleado = instance.nomina_empleado_id
+
+        # Verifica si el empleado existe
+        if empleado:
+            # Filtra las compras del empleado en el mes de la nómina
+            compras_empleado = CompraProducto.objects.filter(
+                compra__compra_empleado_id=empleado,
+                compra__compra_fecha__month=instance.nomina_fecha.month,
+                compra__compra_fecha__year=instance.nomina_fecha.year,
+            )
+
+            # Calcula el total de las compras del empleado en el mes
+            total_compras = sum(compra.compra_total for compra in compras_empleado)
+
+            # Actualiza el valor de nomina_tienda en la instancia de Nomina
+            instance.nomina_tienda = total_compras
+            instance.save()
+
+@receiver(post_save, sender=Nomina)
+def calcular_ingreso_total(sender, instance, created, **kwargs):
+    if created:
+        # Realizar el cálculo de nomina_ingreso_total
+        sueldo_base = instance.nomina_sueldo_base
+        aumento = instance.nomina_aumento_total
+        horas_extras = instance.nomina_extras_calculada
+        horas_dobles = instance.nomina_dobles_calculada
+        comision = instance.nomina_comision
+        bonificacion = instance.nomina_bonificacion
+
+        ingreso_total = (
+            sueldo_base + aumento + horas_extras + horas_dobles + comision + bonificacion
+        )
+
+        # Actualizar el campo nomina_ingreso_total en la instancia de Nomina
+        instance.nomina_ingreso_total = ingreso_total
+        instance.save()
+
+@receiver(post_save, sender=Nomina)
+def calcular_descuento_total(sender, instance, created, **kwargs):
+    if created:
+        # Realizar el cálculo de nomina_descuento_total
+        igss = instance.nomina_igss
+        prestamo = instance.nomina_prestamo
+        tienda = instance.nomina_tienda
+        aporte = instance.nomina_aporte
+
+        descuento_total = igss + prestamo + tienda + aporte
+
+        # Actualizar el campo nomina_descuento_total en la instancia de Nomina
+        instance.nomina_descuento_total = descuento_total
+        instance.save()
+
+@receiver(post_save, sender=Nomina)
+def calcular_neto(sender, instance, created, **kwargs):
+    if created:
+        # Realizar el cálculo de nomina_neto
+        ingreso_total = instance.nomina_ingreso_total
+        descuento_total = instance.nomina_descuento_total
+
+        neto = ingreso_total - descuento_total
+
+        # Actualizar el campo nomina_neto en la instancia de Nomina
+        instance.nomina_neto = neto
         instance.save()
 
