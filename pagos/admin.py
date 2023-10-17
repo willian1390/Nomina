@@ -10,10 +10,10 @@ from django.http import HttpResponse, FileResponse
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Paragraph, Image, PageBreak
-from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet
-from django.utils.safestring import mark_safe
 styles = getSampleStyleSheet()
+
+
 
 def generar_pdf_nomina(modeladmin, request, queryset):
     response = HttpResponse(content_type="application/pdf")
@@ -99,6 +99,11 @@ def generar_pdf_igss(modeladmin, request, queryset):
     elements.append(logo)
     elements.append(Spacer(1, 35))
 
+    title = "IGSS"
+    title_paragraph = Paragraph(title, getSampleStyleSheet()['Title'])
+    elements.append(title_paragraph)
+    elements.append(Spacer(1, 10))
+
     for igss in queryset:
         data = []
 
@@ -121,7 +126,7 @@ def generar_pdf_igss(modeladmin, request, queryset):
         data.append(["Nombre completo de madre:", igss.igss_ncm, "", ""])
         data.append(["", "", "", ""])
         data.append(["Nombre de empresa:", "Sport", ""])
-        data.append(["Ocupación:", empleado.empleado_puesto, "IGSS:", igss.igss_cantidad])
+        data.append(["Ocupación:", empleado.empleado_puesto, "Monto IGSS:", igss.igss_cantidad])
 
         # Crear una tabla con los datos
         table = Table(data, colWidths=[150, 300, 150, 150])
@@ -143,16 +148,124 @@ def generar_pdf_igss(modeladmin, request, queryset):
     signature_paragraph = Paragraph(signature_text, styles['Normal'])
     elements.append(signature_paragraph)
 
-    # elements.append(Spacer(1, 25))
-    # # Agregar la palabra "Sello:" fuera del cuadro
-    # sello_text = "Sello:___________________________________________"
-    # sello_paragraph = Paragraph(sello_text, styles['Normal'])
-    # elements.append(sello_paragraph)
+    doc.build(elements)
+    return response
+
+generar_pdf_igss.short_description = "Reporte PDF IGSS"
+
+def generar_pdf_bono14(modeladmin, request, queryset):
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = "attachment; filename=detalle_bono14.pdf"
+
+    # Crear un objeto PDF con ReportLab
+    doc = SimpleDocTemplate(response, pagesize=letter)
+    elements = []
+
+    # Logo de la empresa
+    logo = Image('pagos/img_logo/logo.png', width=70, height=70)
+    elements.append(logo)
+    elements.append(Spacer(1, 35))
+
+    title = "Bono 14"
+    title_paragraph = Paragraph(title, getSampleStyleSheet()['Title'])
+    elements.append(title_paragraph)
+    elements.append(Spacer(1, 10))
+
+    for bono in queryset:
+        data = []
+
+        # Información del empleado y la fecha
+        empleado = bono.bono_empleado_id
+        fecha = bono.bono_fecha.strftime('%d/%m/%Y')
+
+        data.append([f"Empleado: {empleado.empleado_nombre} {empleado.empleado_apellido}"])
+        data.append([f"Fecha: {fecha}"])
+        data.append([f"Codigo: {empleado.empleado_id}"])
+        data.append([f"Monto: {bono.bono_monto}"])
+
+        # Crear una tabla con los datos
+        table = Table(data, colWidths=[300])
+        table.setStyle(TableStyle([
+
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+
+        elements.append(table)
+        elements.append(Spacer(1, 12))
+
+    elements.append(Spacer(1, 35))
+
+    styles = getSampleStyleSheet()
+    signature_text = "Firma Empleado:___________________________________________"
+    signature_paragraph = Paragraph(signature_text, styles['Normal'])
+    elements.append(signature_paragraph)
+
+    elements.append(Spacer(1, 35))
 
     doc.build(elements)
     return response
 
-generar_pdf_igss.short_description = "Generar PDF IGSS"
+generar_pdf_bono14.short_description = "Reporte PDF Bono14"
+
+def generar_pdf_aguinaldo(modeladmin, request, queryset):
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = "attachment; filename=detalle_aguinaldo.pdf"
+
+    # Crear un objeto PDF con ReportLab
+    doc = SimpleDocTemplate(response, pagesize=letter)
+    elements = []
+
+    # Logo de la empresa
+    logo = Image('pagos/img_logo/logo.png', width=70, height=70)
+    elements.append(logo)
+    elements.append(Spacer(1, 35))
+
+    title = "Aguinaldo"
+    title_paragraph = Paragraph(title, getSampleStyleSheet()['Title'])
+    elements.append(title_paragraph)
+    elements.append(Spacer(1, 10))
+
+    for aguinaldo in queryset:
+        data = []
+
+        # Información del empleado y la fecha
+        empleado = aguinaldo.aguinaldo_empleado_id
+        fecha = aguinaldo.aguinaldo_fecha.strftime('%d/%m/%Y')
+
+        data.append([f"Empleado: {empleado.empleado_nombre} {empleado.empleado_apellido}"])
+        data.append([f"Fecha: {fecha}"])
+        data.append([f"Codigo: {empleado.empleado_id}"])
+        data.append([f"Monto: {aguinaldo.aguinaldo_monto}"])
+
+        # Crear una tabla con los datos
+        table = Table(data, colWidths=[300])
+        table.setStyle(TableStyle([
+
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+
+        elements.append(table)
+        elements.append(Spacer(1, 12))
+
+    elements.append(Spacer(1, 35))
+
+    styles = getSampleStyleSheet()
+    signature_text = "Firma Empleado:___________________________________________"
+    signature_paragraph = Paragraph(signature_text, styles['Normal'])
+    elements.append(signature_paragraph)
+
+    elements.append(Spacer(1, 35))
+
+    doc.build(elements)
+    return response
+
+generar_pdf_aguinaldo.short_description = "Reporte PDF Aguinaldo"
 
 def generar_pdf_prestamo(modeladmin, request, queryset):
     response = HttpResponse(content_type="application/pdf")
@@ -168,6 +281,11 @@ def generar_pdf_prestamo(modeladmin, request, queryset):
     elements.append(logo)
     elements.append(Spacer(1, 35))
 
+    title = "Prestamo"
+    title_paragraph = Paragraph(title, getSampleStyleSheet()['Title'])
+    elements.append(title_paragraph)
+    elements.append(Spacer(1, 10))
+
     for prestamo in queryset:
         data = []
 
@@ -175,8 +293,8 @@ def generar_pdf_prestamo(modeladmin, request, queryset):
         empleado = prestamo.prestamo_empleado_id
         fecha = prestamo.prestamo_fecha.strftime('%d/%m/%Y')
 
-        data.append([f"Nombre completo: {empleado.empleado_nombre} {empleado.empleado_apellido}", f"Fecha: {fecha}"])
-        data.append([f"Puesto de empleado: {empleado.empleado_puesto}", ""])
+        data.append([f"Empleado: {empleado.empleado_nombre} {empleado.empleado_apellido}", f"Fecha: {fecha}"])
+        data.append([f"Puesto: {empleado.empleado_puesto}", ""])
         data.append(["Interes Anual: 5%", "Interes Mensual: 0.417%"])
         data.append([f"Monto acreditado: {prestamo.prestamo_cantidad}", f"Plazo: {prestamo.prestamo_meses} Meses"])
         total_pagar = prestamo.prestamo_mensualidad * prestamo.prestamo_meses
@@ -208,7 +326,7 @@ def generar_pdf_prestamo(modeladmin, request, queryset):
     doc.build(elements)
     return response
 
-generar_pdf_prestamo.short_description = "Generar PDF de Prestamo"
+generar_pdf_prestamo.short_description = "Reporte PDF Prestamo"
 
 def generar_pdf_liquidacion(modeladmin, request, queryset):
     response = HttpResponse(content_type="application/pdf")
@@ -274,7 +392,7 @@ class NominaAdmin(admin.ModelAdmin):
     actions = [generar_pdf_nomina]
     readonly_fields=('nomina_fecha', 'nomina_comision', 'nomina_bonificacion', 
                     'nomina_bono', 'nomina_aguinaldo', 'nomina_igss', 'nomina_tienda', 'nomina_prestamo',
-                    'nomina_neto','nomina_sueldo_base','nomina_aumento_total',
+                    'nomina_ausencia','nomina_neto','nomina_sueldo_base','nomina_aumento_total',
                     'nomina_extras_calculada','nomina_dobles_calculada',
                     'nomina_ingreso_total','nomina_descuento_total','nomina_aporte',)
 
@@ -285,7 +403,7 @@ class NominaAdmin(admin.ModelAdmin):
               ('nomina_dobles','nomina_dobles_calculada'),
                ('nomina_ventas', 'nomina_comision'),
                 ('nomina_piezas','nomina_bonificacion'), 
-                ('nomina_igss','nomina_tienda','nomina_prestamo'),
+                ('nomina_igss','nomina_tienda','nomina_prestamo', 'nomina_ausencia'),
                 ('nomina_ingreso_total','nomina_descuento_total', 'nomina_neto')
                 ]
     list_display = ('nomina_id', 'nomina_empleado_id','nomina_ingreso_total',)
@@ -309,9 +427,13 @@ class IgssAdmin(admin.ModelAdmin):
     list_display=('igss_empleado_id', 'igss_cantidad')
 
 class Bono14Admin(admin.ModelAdmin):
+     actions = [generar_pdf_bono14]
+     readonly_fields=('bono_monto',)
      list_display=('bono_fecha' ,'bono_empleado_id', 'bono_monto')
 
 class AguinaldoAdmin(admin.ModelAdmin):
+    actions = [generar_pdf_aguinaldo]
+    readonly_fields=('aguinaldo_monto',)
     list_display=('aguinaldo_fecha' ,'aguinaldo_empleado_id', 'aguinaldo_monto')
 
 admin.site.register(Nomina, NominaAdmin)

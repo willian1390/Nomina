@@ -1,7 +1,10 @@
+pip freeze > requirements.txt
+
 list_display_links #para que un atributo funcione como link
 list_editable #para agregar en la pantalla si un atributo es editable desde el panel
 fields = ['xx'] #solo aparecen estos atributos
 fields = ['xx', ('xx','yy')] # atributos en la misma fila
+date_hierarchy='fecha de creacion'
 
 #Crea grupos con secciones
     fieldsets =(
@@ -9,3 +12,67 @@ fields = ['xx', ('xx','yy')] # atributos en la misma fila
             'fields': ('nomina_empleado_id', 'nomina_sueldo_base', 'nomina_aumento_total','nomina_interes',),
         }),
     )
+
+
+#Pendientes
+Liquidacion ✅ ⬅️ detalles sobre bono y aguinaldo
+Si liquidan al empleado estado=False✅
+firma de documento aportes e igss ✅
+🔘documentos de expediente en formato pdf ✅
+🔘descuentos por ausencias ✅
+🔘bono 14 y aguinaldo con recibo ✅
+
+🔘list_per_page = 15
+🔘list_display_links
+list_filter = ('empleado_estado',)# cuadro derecho 
+exclude = ('',) 
+buscador 
+🔘si empleado gasta mas de 50% de su salario en tienda se denega
+🔘Anticipo de quincena 45%
+🔘Empleado solo puede tener 1 prestamo y 1 aporte y 1 liquidacion
+🔘descuentos Aportes y Prestamos solo 1 por mes
+🔘los campos numericos siempre deben ser positivos
+    from django.core.validators import MinValueValidator
+    class MiModelo(models.Model):
+        decimal_positivo = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+
+🔘informe de cuotas realizadas en igss (No tabla de registros)
+🔘informe de transferencias realizadas por empleado (No tabla de registros)
+
+BUSCAR
+ploty
+Quantlib
+yfinance
+
+
+
+
+    def save_model(self, request, obj, form, change):
+        # Calcular el salario total del empleado (salario + aumento)
+        salario_total = obj.compra_empleado_id.empleado_salario + obj.compra_empleado_id.empleado_aumento
+
+        # Calcular el total de la compra
+        total_compra = sum(item.compra_total for item in obj.compraproducto_set.all())
+
+        # Verificar si la compra total excede el salario total del empleado
+        if total_compra > salario_total:
+            self.message_user(request, "La compra no se puede realizar porque excede el salario del empleado.", messages.ERROR)
+        else:
+            super().save_model(request, obj, form, change)
+
+
+    def clean(self):
+        if self.ausencia_aprovacion:
+            self.ausencia_desNomina.editable = True
+            self.ausencia_descuento.editable = True
+        else:
+            self.ausencia_desNomina.editable = False
+            self.ausencia_descuento.editable = False
+        if self.ausencia_desNomina and not self.ausencia_descuento:
+            raise ValidationError({'ausencia_descuento': ' Debe rellenar este campo por haber marcado "Descuento en nomina" '})
+        elif not self.ausencia_desNomina and self.ausencia_descuento:
+            self.ausencia_descuento = None
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
