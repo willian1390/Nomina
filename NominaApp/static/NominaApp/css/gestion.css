@@ -3,8 +3,9 @@ body {
   background: linear-gradient(rgba(47, 23, 15, 0.65), rgba(47, 23, 15, 0.65)), url("../img/bg_main.jpg");
   background-attachment: fixed;
   background-position: center;
-  background-size: cover;
+  background-size: cover;  
 }
+
 
 h1,
 h2,
@@ -82,6 +83,9 @@ p {
 #mainNav {
   background-color: rgb(17 69 111 / 49%);
   font-family: 'Raleway';
+  border-radius: 20px;
+  width: 80%;
+  margin: 0 auto;
 }
 
 #mainNav .navbar-brand {

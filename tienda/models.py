@@ -8,7 +8,11 @@ class Seccion(models.Model):
     seccion_nombre =  models.CharField(max_length=50, verbose_name="Nombre de seccion")        
     #cadena
     def __str__(self):
-        return self.seccion_nombre    
+        return self.seccion_nombre   
+    #Definicion de nombre en singular y plural
+    class Meta:
+        verbose_name='Seccion'
+        verbose_name_plural='Secciones' 
 
 class Producto(models.Model):
     producto_id = models.AutoField(primary_key=True)

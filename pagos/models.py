@@ -136,6 +136,10 @@ class Bono14(models.Model):
     #cadena
     def __str__(self):
         return f"{self.bono_empleado_id.empleado_nombre} { self.bono_empleado_id.empleado_apellido}"
+    #Definicion de nombre en singular y plural
+    class Meta:
+        verbose_name='Bono 14'
+        verbose_name_plural='Bono 14'
 
 class Aguinaldo(models.Model):
     aguinaldo_id = models.AutoField(primary_key=True)
@@ -208,7 +212,10 @@ class Liquidacion(models.Model):
     #cadena
     def __str__(self):
         return f"{self.liquidacion_empleado_id.empleado_nombre} { self.liquidacion_empleado_id.empleado_apellido}, {self.liquidacion_empleado_id.empleado_puesto}"
-
+    #Definicion de nombre en singular y plural
+    class Meta:
+        verbose_name='Liquidacion'
+        verbose_name_plural='Liquidaciones'
 
 @receiver(pre_save, sender=Bono14)
 def calcular_bono_14(sender, instance, **kwargs):
